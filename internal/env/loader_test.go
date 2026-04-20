@@ -19,8 +19,8 @@ func writeDotenv(t *testing.T, content string) string {
 
 func TestRefScanning(t *testing.T) {
 	p := writeDotenv(t, `
-STRIPE_KEY=secret://stripe/key
-DB_URL=secret://db/url
+STRIPE_KEY=enveil://stripe/key
+DB_URL=enveil://db/url
 PLAIN=hello
 `)
 	envSlice, refs, err := env.Load(p)
@@ -78,7 +78,7 @@ func TestNonRefPassthrough(t *testing.T) {
 }
 
 func TestParseRef(t *testing.T) {
-	key, ok := env.ParseRef("secret://stripe/key")
+	key, ok := env.ParseRef("enveil://stripe/key")
 	if !ok || key != "stripe/key" {
 		t.Fatalf("ParseRef: got %q %v", key, ok)
 	}

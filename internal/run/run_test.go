@@ -15,7 +15,7 @@ import (
 func TestApplyResolvedViaEnv(t *testing.T) {
 	// Write a .env with a mix of refs and plain values.
 	p := filepath.Join(t.TempDir(), ".env")
-	os.WriteFile(p, []byte("STRIPE_KEY=secret://stripe/key\nPLAIN=hello\n"), 0644)
+	os.WriteFile(p, []byte("STRIPE_KEY=enveil://stripe/key\nPLAIN=hello\n"), 0644)
 
 	_, refs, err := env.Load(p)
 	if err != nil {
@@ -39,10 +39,10 @@ func TestStrictModeNoPassthrough(t *testing.T) {
 	if env.IsSecretRef("plaintext") {
 		t.Fatal("plain value should not be a secret ref")
 	}
-	if !env.IsSecretRef("secret://stripe/key") {
-		t.Fatal("secret:// value should be a secret ref")
+	if !env.IsSecretRef("enveil://stripe/key") {
+		t.Fatal("enveil:// value should be a secret ref")
 	}
-	if env.IsSecretRef("secret://no-field") {
+	if env.IsSecretRef("enveil://no-field") {
 		t.Fatal("malformed secret ref (no field) should not match")
 	}
 }

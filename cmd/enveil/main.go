@@ -2,9 +2,13 @@
 package main
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 
+	"github.com/leonzalion/enveil/internal/agent"
 	"github.com/leonzalion/enveil/internal/run"
 	"github.com/leonzalion/enveil/internal/store"
 	"github.com/spf13/cobra"
@@ -19,6 +23,10 @@ const (
 func storePath() string {
 	home, _ := os.UserHomeDir()
 	return home + "/.enveil"
+}
+
+func agentSockPath() string {
+	return agent.SocketPath(os.Getuid())
 }
 
 func main() {
@@ -156,15 +164,25 @@ func secretAddCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			item, field := args[0], args[1]
-			password, err := promptPassword("Master password: ")
-			if err != nil {
-				return err
-			}
 			value, err := promptPassword(fmt.Sprintf("Value for %s/%s: ", item, field))
 			if err != nil {
 				return err
 			}
 
+			resp, agentErr := dialAgent(agent.Request{Op: agent.OpAdd, Item: item, Field: field, Value: string(value)})
+			if agentErr == nil {
+				if resp.Error != "" {
+					return fmt.Errorf("agent error: %s", resp.Error)
+				}
+				fmt.Fprintf(os.Stderr, "Added %s/%s\n", item, field)
+				return nil
+			}
+
+			// Agent unreachable — fall back to direct store access.
+			password, err := promptPassword("Master password: ")
+			if err != nil {
+				return err
+			}
 			sp := storePath()
 			if _, err := os.Stat(sp); os.IsNotExist(err) {
 				return fmt.Errorf("store not initialised — run: enveil init")
@@ -173,7 +191,6 @@ func secretAddCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-
 			s.Add(item, field, string(value))
 			if err := s.Save(); err != nil {
 				return fmt.Errorf("saving store: %w", err)
@@ -189,6 +206,18 @@ func secretListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List all secret keys (item/field) in the store",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			resp, agentErr := dialAgent(agent.Request{Op: agent.OpList})
+			if agentErr == nil {
+				if resp.Error != "" {
+					return fmt.Errorf("agent error: %s", resp.Error)
+				}
+				for _, k := range resp.Keys {
+					fmt.Println(k)
+				}
+				return nil
+			}
+
+			// Agent unreachable — fall back to direct store access.
 			password, err := promptPassword("Master password: ")
 			if err != nil {
 				return err
@@ -212,6 +241,17 @@ func secretDeleteCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			item, field := args[0], args[1]
+
+			resp, agentErr := dialAgent(agent.Request{Op: agent.OpDelete, Item: item, Field: field})
+			if agentErr == nil {
+				if resp.Error != "" {
+					return fmt.Errorf("agent error: %s", resp.Error)
+				}
+				fmt.Fprintf(os.Stderr, "Deleted %s/%s\n", item, field)
+				return nil
+			}
+
+			// Agent unreachable — fall back to direct store access.
 			password, err := promptPassword("Master password: ")
 			if err != nil {
 				return err
@@ -239,15 +279,26 @@ func secretRotateCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			item, field := args[0], args[1]
+			newVal, err := promptPassword(fmt.Sprintf("New value for %s/%s: ", item, field))
+			if err != nil {
+				return err
+			}
+
+			resp, agentErr := dialAgent(agent.Request{Op: agent.OpRotate, Item: item, Field: field, Value: string(newVal)})
+			if agentErr == nil {
+				if resp.Error != "" {
+					return fmt.Errorf("agent error: %s", resp.Error)
+				}
+				fmt.Fprintf(os.Stderr, "Rotated %s/%s\n", item, field)
+				return nil
+			}
+
+			// Agent unreachable — fall back to direct store access.
 			password, err := promptPassword("Master password: ")
 			if err != nil {
 				return err
 			}
 			s, err := store.Open(storePath(), password)
-			if err != nil {
-				return err
-			}
-			newVal, err := promptPassword(fmt.Sprintf("New value for %s/%s: ", item, field))
 			if err != nil {
 				return err
 			}
@@ -262,6 +313,34 @@ func secretRotateCmd() *cobra.Command {
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+// dialAgent dials the running agent, sends req, reads and returns one response.
+// Returns an error if the agent is unreachable or the exchange fails.
+func dialAgent(req agent.Request) (agent.Response, error) {
+	sockPath := os.Getenv("ENVEIL_AUTH_SOCK")
+	if sockPath == "" {
+		sockPath = agentSockPath()
+	}
+
+	conn, err := net.Dial("unix", sockPath)
+	if err != nil {
+		return agent.Response{}, err
+	}
+	defer conn.Close()
+
+	b, _ := json.Marshal(req)
+	conn.Write(append(b, '\n'))
+
+	scanner := bufio.NewScanner(conn)
+	if !scanner.Scan() {
+		return agent.Response{}, fmt.Errorf("agent closed connection unexpectedly")
+	}
+	var resp agent.Response
+	if err := json.Unmarshal(scanner.Bytes(), &resp); err != nil {
+		return agent.Response{}, fmt.Errorf("invalid agent response: %w", err)
+	}
+	return resp, nil
+}
 
 func promptPassword(prompt string) ([]byte, error) {
 	fmt.Fprint(os.Stderr, prompt)

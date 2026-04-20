@@ -19,6 +19,18 @@ type Resolver interface {
 	Resolve(key string) (string, error)
 }
 
+// Lister returns all item/field key names in the store (no values).
+type Lister interface {
+	List() []string
+}
+
+// Mutator supports adding, deleting, and persisting secrets in the store.
+type Mutator interface {
+	Add(item, field, value string)
+	Delete(item, field string) bool
+	Save() error
+}
+
 // Agent is a running socket server that resolves secrets.
 type Agent struct {
 	socketPath string
@@ -161,6 +173,38 @@ func (a *Agent) handleConn(conn net.Conn) {
 				writeResponse(conn, Response{Error: err.Error()})
 			} else {
 				writeResponse(conn, Response{Value: val})
+			}
+		case OpList:
+			lister, ok := a.resolver.(Lister)
+			if !ok {
+				writeResponse(conn, Response{Error: "list not supported by resolver"})
+			} else {
+				writeResponse(conn, Response{Keys: lister.List()})
+			}
+		case OpAdd, OpRotate:
+			mutator, ok := a.resolver.(Mutator)
+			if !ok {
+				writeResponse(conn, Response{Error: "mutation not supported by resolver"})
+				continue
+			}
+			mutator.Add(req.Item, req.Field, req.Value)
+			if err := mutator.Save(); err != nil {
+				writeResponse(conn, Response{Error: fmt.Sprintf("saving store: %v", err)})
+			} else {
+				writeResponse(conn, Response{})
+			}
+		case OpDelete:
+			mutator, ok := a.resolver.(Mutator)
+			if !ok {
+				writeResponse(conn, Response{Error: "mutation not supported by resolver"})
+				continue
+			}
+			if !mutator.Delete(req.Item, req.Field) {
+				writeResponse(conn, Response{Error: fmt.Sprintf("secret %s/%s not found", req.Item, req.Field)})
+			} else if err := mutator.Save(); err != nil {
+				writeResponse(conn, Response{Error: fmt.Sprintf("saving store: %v", err)})
+			} else {
+				writeResponse(conn, Response{})
 			}
 		default:
 			writeResponse(conn, Response{Error: fmt.Sprintf("unknown op %q", req.Op)})

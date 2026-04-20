@@ -27,6 +27,29 @@ func (m *mockResolver) Resolve(key string) (string, error) {
 	return v, nil
 }
 
+func (m *mockResolver) List() []string {
+	keys := make([]string, 0, len(m.secrets))
+	for k := range m.secrets {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func (m *mockResolver) Add(item, field, value string) {
+	m.secrets[item+"/"+field] = value
+}
+
+func (m *mockResolver) Delete(item, field string) bool {
+	key := item + "/" + field
+	if _, ok := m.secrets[key]; !ok {
+		return false
+	}
+	delete(m.secrets, key)
+	return true
+}
+
+func (m *mockResolver) Save() error { return nil }
+
 type missingError struct{ key string }
 
 func (e *missingError) Error() string { return "secret not found: " + e.key }
@@ -198,4 +221,103 @@ func startAgentWithStore(t *testing.T, r agent.Resolver) (socketPath string, shu
 	<-ready
 	time.Sleep(20 * time.Millisecond)
 	return a.SocketPath(), a.Shutdown
+}
+
+func TestAgentList(t *testing.T) {
+	r := &mockResolver{secrets: map[string]string{
+		"stripe/key":   "sk_live_abc",
+		"postgres/url": "postgres://localhost/db",
+	}}
+	sock, shutdown := startAgent(t, r)
+	defer shutdown()
+
+	resp := sendRequest(t, sock, agent.Request{Op: agent.OpList})
+	if resp.Error != "" {
+		t.Fatalf("unexpected error: %s", resp.Error)
+	}
+	if len(resp.Keys) != 2 {
+		t.Fatalf("expected 2 keys, got %d: %v", len(resp.Keys), resp.Keys)
+	}
+}
+
+func TestAgentListEmpty(t *testing.T) {
+	r := &mockResolver{secrets: map[string]string{}}
+	sock, shutdown := startAgent(t, r)
+	defer shutdown()
+
+	resp := sendRequest(t, sock, agent.Request{Op: agent.OpList})
+	if resp.Error != "" {
+		t.Fatalf("unexpected error: %s", resp.Error)
+	}
+	if len(resp.Keys) != 0 {
+		t.Fatalf("expected 0 keys, got %d", len(resp.Keys))
+	}
+}
+
+func TestAgentAdd(t *testing.T) {
+	r := &mockResolver{secrets: map[string]string{}}
+	sock, shutdown := startAgent(t, r)
+	defer shutdown()
+
+	resp := sendRequest(t, sock, agent.Request{Op: agent.OpAdd, Item: "stripe", Field: "key", Value: "sk_live_xyz"})
+	if resp.Error != "" {
+		t.Fatalf("unexpected error from OpAdd: %s", resp.Error)
+	}
+
+	// Verify the secret is now resolvable.
+	resp = sendRequest(t, sock, agent.Request{Op: agent.OpResolve, Ref: "stripe/key"})
+	if resp.Error != "" {
+		t.Fatalf("resolve after add failed: %s", resp.Error)
+	}
+	if resp.Value != "sk_live_xyz" {
+		t.Fatalf("expected sk_live_xyz, got %q", resp.Value)
+	}
+}
+
+func TestAgentDelete(t *testing.T) {
+	r := &mockResolver{secrets: map[string]string{"stripe/key": "sk_live_abc"}}
+	sock, shutdown := startAgent(t, r)
+	defer shutdown()
+
+	resp := sendRequest(t, sock, agent.Request{Op: agent.OpDelete, Item: "stripe", Field: "key"})
+	if resp.Error != "" {
+		t.Fatalf("unexpected error from OpDelete: %s", resp.Error)
+	}
+
+	// Verify the secret is gone.
+	resp = sendRequest(t, sock, agent.Request{Op: agent.OpResolve, Ref: "stripe/key"})
+	if resp.Error == "" {
+		t.Fatal("expected error resolving deleted key, got none")
+	}
+}
+
+func TestAgentDeleteMissingKey(t *testing.T) {
+	r := &mockResolver{secrets: map[string]string{}}
+	sock, shutdown := startAgent(t, r)
+	defer shutdown()
+
+	resp := sendRequest(t, sock, agent.Request{Op: agent.OpDelete, Item: "stripe", Field: "key"})
+	if resp.Error == "" {
+		t.Fatal("expected error deleting non-existent key, got none")
+	}
+}
+
+func TestAgentRotate(t *testing.T) {
+	r := &mockResolver{secrets: map[string]string{"stripe/key": "sk_live_old"}}
+	sock, shutdown := startAgent(t, r)
+	defer shutdown()
+
+	resp := sendRequest(t, sock, agent.Request{Op: agent.OpRotate, Item: "stripe", Field: "key", Value: "sk_live_new"})
+	if resp.Error != "" {
+		t.Fatalf("unexpected error from OpRotate: %s", resp.Error)
+	}
+
+	// Verify the updated value.
+	resp = sendRequest(t, sock, agent.Request{Op: agent.OpResolve, Ref: "stripe/key"})
+	if resp.Error != "" {
+		t.Fatalf("resolve after rotate failed: %s", resp.Error)
+	}
+	if resp.Value != "sk_live_new" {
+		t.Fatalf("expected sk_live_new, got %q", resp.Value)
+	}
 }

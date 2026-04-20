@@ -9,7 +9,7 @@
 # Agent runtime files
 .enveil-agent.env
 
-# .env files (may contain secret:// references)
+# .env files (may contain enveil:// references)
 .env
 .env.*
 

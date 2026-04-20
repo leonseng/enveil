@@ -9,8 +9,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// refPattern matches secret://item/field references.
-var refPattern = regexp.MustCompile(`^secret://([^/]+)/([^/]+)$`)
+// refPattern matches enveil://item/field references.
+var refPattern = regexp.MustCompile(`^enveil://([^/]+)/([^/]+)$`)
 
 // SecretRef is a parsed secret reference from an env var value.
 type SecretRef struct {
@@ -69,12 +69,12 @@ func Load(dotenvPath string) ([]string, []SecretRef, error) {
 	return env, refs, nil
 }
 
-// IsSecretRef reports whether value is a secret:// reference.
+// IsSecretRef reports whether value is an enveil:// reference.
 func IsSecretRef(value string) bool {
 	return refPattern.MatchString(value)
 }
 
-// ParseRef extracts the store key from a secret:// reference.
+// ParseRef extracts the store key from an enveil:// reference.
 // Returns ("", false) if value is not a reference.
 func ParseRef(value string) (key string, ok bool) {
 	m := refPattern.FindStringSubmatch(value)

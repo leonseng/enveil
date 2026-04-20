@@ -13,7 +13,7 @@ import (
 	"github.com/leonzalion/enveil/internal/env"
 )
 
-// Run resolves all secret:// references from dotenvPath, then exec's cmd with args.
+// Run resolves all enveil:// references from dotenvPath, then exec's cmd with args.
 // It never returns on success (syscall.Exec replaces the process).
 func Run(dotenvPath string, cmd string, args []string) error {
 	envSlice, refs, err := env.Load(dotenvPath)
@@ -26,11 +26,11 @@ func Run(dotenvPath string, cmd string, args []string) error {
 		if err != nil {
 			return err
 		}
-		// Replace secret:// values in envSlice with resolved plaintext.
+		// Replace enveil:// values in envSlice with resolved plaintext.
 		envSlice = applyResolved(envSlice, resolved)
 	}
 
-	// Sanity check: no secret:// references should remain.
+	// Sanity check: no enveil:// references should remain.
 	for _, kv := range envSlice {
 		parts := strings.SplitN(kv, "=", 2)
 		if len(parts) == 2 && env.IsSecretRef(parts[1]) {
@@ -80,7 +80,7 @@ func resolveRefs(refs []env.SecretRef) (map[string]string, error) {
 	return resolved, nil
 }
 
-// applyResolved replaces secret:// values in the env slice with plaintext.
+// applyResolved replaces enveil:// values in the env slice with plaintext.
 func applyResolved(envSlice []string, resolved map[string]string) []string {
 	out := make([]string, len(envSlice))
 	for i, kv := range envSlice {

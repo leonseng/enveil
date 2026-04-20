@@ -10,7 +10,7 @@ A CLI tool that stores secrets in a local encrypted file, exposes them to child 
 ```
 enveil run -- npm run dev
        │
-       ├── reads .env, finds secret://stripe/key
+       ├── reads .env, finds enveil://stripe/key
        ├── connects to agent socket
        ├── receives plaintext over socket
        └── exec() → npm run dev (inherits resolved env)
@@ -40,7 +40,7 @@ enveil agent start
 - On start: checks for and cleans up any stale socket file before binding
 - Listens on `/tmp/enveil-agent-$UID.sock` (mode 0600)
 - Writes socket path + PID to `~/.enveil-agent.env` on successful start
-- Protocol: newline-delimited JSON — `{"op":"resolve","ref":"secret://stripe/key"}` → `{"value":"sk_live_..."}`
+- Protocol: newline-delimited JSON — `{"op":"resolve","ref":"enveil://stripe/key"}` → `{"value":"sk_live_..."}`
 - Exits cleanly on `SIGTERM` / `SIGHUP`, zeroes key memory on exit
 - Removes socket file and `~/.enveil-agent.env` on clean exit
 
@@ -59,8 +59,8 @@ type Verifier interface {
 Both platforms: peer credentials obtained via `SO_PEERCRED` (Linux) / `LOCAL_PEERCRED` (macOS) immediately on accept, before reading any data.
 
 **4. Reference parser**
-- Scans env var values for `secret://item/field` pattern
-- Regex: `^secret://([^/]+)/([^/]+)$`
+- Scans env var values for `enveil://item/field` pattern
+- Regex: `^enveil://([^/]+)/([^/]+)$`
 - Leaves non-matching values untouched
 - Collects all refs before opening socket — one connection per `run` invocation, batch-resolves all refs
 

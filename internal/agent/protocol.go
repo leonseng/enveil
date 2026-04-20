@@ -7,18 +7,26 @@ type Op string
 
 const (
 	OpResolve = Op("resolve")
+	OpList    = Op("list")
+	OpAdd     = Op("add")
+	OpDelete  = Op("delete")
+	OpRotate  = Op("rotate")
 )
 
 // Request is sent by the client to the agent.
 type Request struct {
-	Op  Op     `json:"op"`
-	Ref string `json:"ref,omitempty"`
+	Op    Op     `json:"op"`
+	Ref   string `json:"ref,omitempty"`
+	Item  string `json:"item,omitempty"`
+	Field string `json:"field,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
 // Response is sent by the agent back to the client.
 type Response struct {
-	Value string `json:"value,omitempty"`
-	Error string `json:"error,omitempty"`
+	Value string   `json:"value,omitempty"`
+	Keys  []string `json:"keys,omitempty"`
+	Error string   `json:"error,omitempty"`
 }
 
 // encodeRequest serialises a request to newline-delimited JSON.

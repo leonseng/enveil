@@ -3,7 +3,7 @@
 A CLI tool that stores secrets in a local encrypted file and injects them into child processes — without ever placing them in plaintext on disk or in environment variables visible to co-resident processes (including AI coding assistants).
 
 ```
-STRIPE_KEY=secret://stripe/key   # in your .env
+STRIPE_KEY=enveil://stripe/key   # in your .env
 ```
 
 ```bash
@@ -17,7 +17,7 @@ enveil run -- npm run dev        # npm run dev inherits STRIPE_KEY resolved to t
 ```
 enveil run -- npm run dev
        │
-       ├── reads .env, finds secret://stripe/key
+       ├── reads .env, finds enveil://stripe/key
        ├── connects to agent socket
        ├── receives plaintext over socket (never touches disk)
        └── syscall.Exec() → npm run dev (inherits resolved env)
@@ -89,25 +89,24 @@ eval $(enveil agent start)
 
 ```bash
 enveil secret add stripe key
-# Master password: ••••••••
 # Value for stripe/key: ••••••••••••••••
 
 enveil secret add postgres url
-# Master password: ••••••••
 # Value for postgres/url: ••••••••••••••••
 ```
 
 ### 4. Reference them in your `.env`
 
 ```bash
-STRIPE_KEY=secret://stripe/key
-DATABASE_URL=secret://postgres/url
+STRIPE_KEY=enveil://stripe/key
+DATABASE_URL=enveil://postgres/url
 PORT=3000
 ```
 
 ### 5. Run your app
 
 ```bash
+enveil run -- printenv DATABASE_URL
 enveil run -- npm run dev
 enveil run --env .env.production -- ./myapp
 ```
@@ -172,6 +171,24 @@ Secrets are stored in `~/.enveil` — a JSON envelope:
 
 - **KDF:** Argon2id — 64 MiB RAM, 3 passes (tuneable)
 - **Encryption:** ChaCha20-Poly1305 — no hardware dependency, constant-time
+
+---
+
+## Development
+
+```bash
+# Build
+go build -o enveil ./cmd/enveil
+
+# Run all tests
+go test ./...
+
+# Agent protocol tests only
+go test ./internal/agent/...
+
+# CLI integration tests only
+go test ./cmd/enveil/...
+```
 
 ---
 
