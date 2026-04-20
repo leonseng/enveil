@@ -42,7 +42,7 @@ func main() {
 		Short: "Secure secret management for developer environments",
 	}
 
-	root.AddCommand(initCmd(), agentCmd(), runCmd(), secretCmd())
+	root.AddCommand(initCmd(), agentCmd(), runCmd(), secretCmd(), masterPasswordCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
@@ -308,6 +308,55 @@ func secretRotateCmd() *cobra.Command {
 				return fmt.Errorf("saving store: %w", err)
 			}
 			fmt.Fprintf(os.Stderr, "Rotated %s/%s\n", item, field)
+			return nil
+		},
+	}
+}
+
+// ── master-password commands ──────────────────────────────────────────────────
+
+func masterPasswordCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "master-password", Short: "Manage the master password"}
+	cmd.AddCommand(masterPasswordRotateCmd())
+	return cmd
+}
+
+func masterPasswordRotateCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "rotate",
+		Short: "Change the master password (re-encrypts the store)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			sp := storePath()
+			if _, err := os.Stat(sp); os.IsNotExist(err) {
+				return fmt.Errorf("store not initialised — run: enveil init")
+			}
+
+			current, err := promptPassword("Current master password: ")
+			if err != nil {
+				return err
+			}
+			s, err := store.Open(sp, current)
+			if err != nil {
+				return err
+			}
+
+			newPass, err := promptPassword("New master password: ")
+			if err != nil {
+				return err
+			}
+			confirm, err := promptPassword("Re-enter new password: ")
+			if err != nil {
+				return err
+			}
+			if string(newPass) != string(confirm) {
+				return fmt.Errorf("passwords do not match")
+			}
+
+			if err := s.Rekey(newPass); err != nil {
+				return fmt.Errorf("rekeying store: %w", err)
+			}
+			fmt.Fprintln(os.Stderr, "Master password updated.")
+			fmt.Fprintln(os.Stderr, "Restart the agent: eval $(enveil agent start)")
 			return nil
 		},
 	}

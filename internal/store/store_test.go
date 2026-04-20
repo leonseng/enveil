@@ -79,6 +79,41 @@ func TestTamperedCiphertext(t *testing.T) {
 	}
 }
 
+func TestRekey(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.enveil")
+	oldPass := []byte("oldpassword")
+	newPass := []byte("newpassword")
+
+	s, err := store.Init(path, oldPass)
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	s.Add("stripe", "key", "sk_live_abc")
+	if err := s.Save(); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	if err := s.Rekey(newPass); err != nil {
+		t.Fatalf("Rekey: %v", err)
+	}
+
+	// Should open with new password and retain secrets.
+	s2, err := store.Open(path, newPass)
+	if err != nil {
+		t.Fatalf("Open with new password: %v", err)
+	}
+	val, err := s2.Resolve("stripe/key")
+	if err != nil || val != "sk_live_abc" {
+		t.Fatalf("Resolve after Rekey: got %q %v", val, err)
+	}
+
+	// Should NOT open with old password.
+	_, err = store.Open(path, oldPass)
+	if err == nil {
+		t.Fatal("expected error opening with old password after Rekey, got nil")
+	}
+}
+
 func TestDeleteAndList(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "test.enveil")
 

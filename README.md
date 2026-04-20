@@ -145,6 +145,8 @@ enveil secret add <item> <field>               Prompt for value and add to store
 enveil secret list                             List all item/field keys (never values)
 enveil secret delete <item> <field>            Remove a secret
 enveil secret rotate <item> <field>            Re-prompt and re-encrypt a secret
+
+enveil master-password rotate                  Change the master password (re-encrypts the store)
 ```
 
 ---

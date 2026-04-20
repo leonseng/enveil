@@ -137,6 +137,14 @@ func (s *Store) Save() error {
 	return s.save()
 }
 
+// Rekey re-encrypts the store under a new master password and persists it.
+// The caller must restart the agent after a successful Rekey so it loads
+// the new key from disk.
+func (s *Store) Rekey(newPassword []byte) error {
+	s.password = newPassword
+	return s.save()
+}
+
 func (s *Store) save() error {
 	params := DefaultKDFParams()
 
