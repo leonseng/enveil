@@ -15,6 +15,9 @@ type PathVerifier struct {
 	selfPath string
 }
 
+// NewVerifier returns the platform-appropriate Verifier.
+func NewVerifier() (Verifier, error) { return NewPathVerifier() }
+
 // NewPathVerifier records the current executable path at startup.
 func NewPathVerifier() (*PathVerifier, error) {
 	exe, err := os.Executable()

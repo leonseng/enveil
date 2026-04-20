@@ -14,6 +14,9 @@ type InodeVerifier struct {
 	selfInode uint64
 }
 
+// NewVerifier returns the platform-appropriate Verifier.
+func NewVerifier() (Verifier, error) { return NewInodeVerifier() }
+
 // NewInodeVerifier reads the inode of the current executable at startup.
 func NewInodeVerifier() (*InodeVerifier, error) {
 	var stat syscall.Stat_t

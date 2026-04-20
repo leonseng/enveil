@@ -161,7 +161,7 @@ func runAgentInternal() {
 	}
 
 	var verifier verify.Verifier
-	v, err := verify.NewInodeVerifier()
+	v, err := verify.NewVerifier()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "enveil agent: verifier init: %v\n", err)
 		os.Exit(1)
