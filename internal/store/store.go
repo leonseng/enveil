@@ -97,6 +97,17 @@ func (s *Store) Resolve(key string) (string, error) {
 	return v, nil
 }
 
+// Reload re-reads and decrypts the store file from disk using the stored password.
+// Call this to pick up secrets added after the store was first opened.
+func (s *Store) Reload() error {
+	fresh, err := Open(s.path, s.password)
+	if err != nil {
+		return err
+	}
+	s.secrets = fresh.secrets
+	return nil
+}
+
 // Add sets a secret. Call Save to persist.
 func (s *Store) Add(item, field, value string) {
 	s.secrets[item+"/"+field] = value

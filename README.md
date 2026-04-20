@@ -66,7 +66,17 @@ sudo mv enveil /usr/local/bin/   # or anywhere on your PATH
 
 ## Quick start
 
-### 1. Start the agent
+### 1. Initialise your secret store (one-time)
+
+```bash
+enveil init
+# Master password: ••••••••
+# Re-enter password: ••••••••
+# Secret store initialised at /home/you/.enveil
+# Next: eval $(enveil agent start)
+```
+
+### 2. Start the agent
 
 ```bash
 eval $(enveil agent start)
@@ -75,7 +85,7 @@ eval $(enveil agent start)
 # export ENVEIL_AGENT_PID=12345
 ```
 
-### 2. Add secrets
+### 3. Add secrets
 
 ```bash
 enveil secret add stripe key
@@ -87,7 +97,7 @@ enveil secret add postgres url
 # Value for postgres/url: ••••••••••••••••
 ```
 
-### 3. Reference them in your `.env`
+### 4. Reference them in your `.env`
 
 ```bash
 STRIPE_KEY=secret://stripe/key
@@ -95,7 +105,7 @@ DATABASE_URL=secret://postgres/url
 PORT=3000
 ```
 
-### 4. Run your app
+### 5. Run your app
 
 ```bash
 enveil run -- npm run dev
@@ -130,12 +140,14 @@ fi
 ## CLI reference
 
 ```
-enveil agent start          Start the agent (prompts for master password)
-enveil agent stop           Stop the running agent
-enveil agent status         Exit 0 if running, 1 if not
+enveil init                   Initialise a new store (one-time, prompts + confirms password)
+
+enveil agent start            Start the agent (prompts for master password)
+enveil agent stop             Stop the running agent
+enveil agent status           Exit 0 if running, 1 if not
 
 enveil run [--env .env] -- <cmd> [args...]
-                            Resolve secrets and exec cmd
+                              Resolve secrets and exec cmd
 
 enveil secret add <item> <field>      Prompt for value and add to store
 enveil secret list                    List all item/field keys (never values)

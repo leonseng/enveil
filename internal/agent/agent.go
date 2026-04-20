@@ -137,6 +137,15 @@ func (a *Agent) handleConn(conn net.Conn) {
 		return
 	}
 
+	// Reload from disk so secrets added after agent startup are visible.
+	if r, ok := a.resolver.(interface{ Reload() error }); ok {
+		if err := r.Reload(); err != nil {
+			log.Printf("store reload error: %v", err)
+			writeResponse(conn, Response{Error: "agent: store reload failed"})
+			return
+		}
+	}
+
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
 		var req Request

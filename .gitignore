@@ -9,6 +9,10 @@
 # Agent runtime files
 .enveil-agent.env
 
+# .env files (may contain secret:// references)
+.env
+.env.*
+
 # Go toolchain
 *.test
 *.out

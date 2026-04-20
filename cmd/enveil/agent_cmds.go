@@ -28,13 +28,7 @@ func agentStart() error {
 
 	sp := storePath()
 	if _, err := os.Stat(sp); os.IsNotExist(err) {
-		// Initialise an empty store if none exists.
-		s, err := store.Init(sp, password)
-		if err != nil {
-			return fmt.Errorf("initialising store: %w", err)
-		}
-		_ = s
-		fmt.Fprintln(os.Stderr, "Initialised new secret store at", sp)
+		return fmt.Errorf("store not initialised — run: enveil init")
 	}
 
 	// Validate the password before forking.

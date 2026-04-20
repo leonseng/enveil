@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/leonzalion/enveil/internal/agent"
+	"github.com/leonzalion/enveil/internal/store"
 	"github.com/leonzalion/enveil/internal/verify"
 )
 
@@ -148,4 +149,53 @@ func TestAgentEnvFileContent(t *testing.T) {
 	if !strings.Contains(content, "ENVEIL_AGENT_PID=") {
 		t.Fatalf("env file missing ENVEIL_AGENT_PID: %s", content)
 	}
+}
+
+// TestAgentReloadAfterSecretAdded verifies that secrets written to the store
+// after the agent starts are resolved correctly (stale cache regression test).
+func TestAgentReloadAfterSecretAdded(t *testing.T) {
+	storePath := t.TempDir() + "/.enveil"
+	password := []byte("test123")
+
+	// Initialise an empty store.
+	s, err := store.Init(storePath, password)
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+
+	// Start the agent with the empty store.
+	sock, shutdown := startAgentWithStore(t, s)
+	defer shutdown()
+
+	// Add a secret AFTER the agent has started.
+	s2, err := store.Open(storePath, password)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	s2.Add("postgres", "url", "postgres://localhost/db")
+	if err := s2.Save(); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	// The agent should reload from disk and resolve the new secret.
+	resp := sendRequest(t, sock, agent.Request{Op: agent.OpResolve, Ref: "postgres/url"})
+	if resp.Error != "" {
+		t.Fatalf("expected successful resolve after reload, got error: %s", resp.Error)
+	}
+	if resp.Value != "postgres://localhost/db" {
+		t.Fatalf("expected postgres://localhost/db, got %q", resp.Value)
+	}
+}
+
+func startAgentWithStore(t *testing.T, r agent.Resolver) (socketPath string, shutdown func()) {
+	t.Helper()
+	a := agent.NewWithSocket(r, verify.Noop{}, t.TempDir()+"/agent.sock", t.TempDir()+"/.enveil-agent.env")
+	ready := make(chan struct{})
+	go func() {
+		close(ready)
+		a.Start() //nolint:errcheck
+	}()
+	<-ready
+	time.Sleep(20 * time.Millisecond)
+	return a.SocketPath(), a.Shutdown
 }
