@@ -1,0 +1,25 @@
+# Build output
+/enveil
+/enveil.exe
+
+# Secret store (never commit)
+~/.enveil
+.enveil
+
+# Agent runtime files
+.enveil-agent.env
+
+# Go toolchain
+*.test
+*.out
+/vendor/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
