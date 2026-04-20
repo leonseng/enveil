@@ -77,6 +77,10 @@ func (a *Agent) SocketPath() string { return a.socketPath }
 // Start binds the socket, writes the env file, and begins the accept loop.
 // It blocks until shutdown.
 func (a *Agent) Start() error {
+	// Prevent other processes (even same-UID) from reading /proc/<pid>/environ
+	// or memory-dumping this process.
+	setNoDump()
+
 	// Clean up any stale socket file.
 	os.Remove(a.socketPath)
 

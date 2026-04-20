@@ -56,9 +56,11 @@ Requires Go 1.22+.
 ```bash
 git clone https://github.com/leonzalion/enveil
 cd enveil
-go build -ldflags="-s -w" -o enveil ./cmd/enveil
+CGO_ENABLED=0 go build -ldflags="-s -w" -o enveil ./cmd/enveil
 sudo mv enveil /usr/local/bin/   # or anywhere on your PATH
 ```
+
+> **Why `CGO_ENABLED=0`?** This produces a fully statically-linked binary with no glibc dependency, which eliminates the `LD_PRELOAD` attack surface entirely.
 
 > **Recommended:** compile from source on the target machine to avoid Gatekeeper / EDR friction.
 
@@ -177,8 +179,8 @@ Secrets are stored in `~/.enveil` — a JSON envelope:
 ## Development
 
 ```bash
-# Build
-go build -o enveil ./cmd/enveil
+# Build (statically linked, no CGO)
+CGO_ENABLED=0 go build -o enveil ./cmd/enveil
 
 # Run all tests
 go test ./...
