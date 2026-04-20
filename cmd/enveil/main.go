@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/leonzalion/enveil/internal/agent"
 	"github.com/leonzalion/enveil/internal/run"
@@ -164,12 +165,12 @@ func secretAddCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			item, field := args[0], args[1]
-			value, err := promptPassword(fmt.Sprintf("Value for %s/%s: ", item, field))
+			value, err := promptValue(fmt.Sprintf("Value for %s/%s: ", item, field))
 			if err != nil {
 				return err
 			}
 
-			resp, agentErr := dialAgent(agent.Request{Op: agent.OpAdd, Item: item, Field: field, Value: string(value)})
+			resp, agentErr := dialAgent(agent.Request{Op: agent.OpAdd, Item: item, Field: field, Value: value})
 			if agentErr == nil {
 				if resp.Error != "" {
 					return fmt.Errorf("agent error: %s", resp.Error)
@@ -191,7 +192,7 @@ func secretAddCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			s.Add(item, field, string(value))
+			s.Add(item, field, value)
 			if err := s.Save(); err != nil {
 				return fmt.Errorf("saving store: %w", err)
 			}
@@ -279,12 +280,12 @@ func secretRotateCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			item, field := args[0], args[1]
-			newVal, err := promptPassword(fmt.Sprintf("New value for %s/%s: ", item, field))
+			newVal, err := promptValue(fmt.Sprintf("New value for %s/%s: ", item, field))
 			if err != nil {
 				return err
 			}
 
-			resp, agentErr := dialAgent(agent.Request{Op: agent.OpRotate, Item: item, Field: field, Value: string(newVal)})
+			resp, agentErr := dialAgent(agent.Request{Op: agent.OpRotate, Item: item, Field: field, Value: newVal})
 			if agentErr == nil {
 				if resp.Error != "" {
 					return fmt.Errorf("agent error: %s", resp.Error)
@@ -302,7 +303,7 @@ func secretRotateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			s.Add(item, field, string(newVal))
+			s.Add(item, field, newVal)
 			if err := s.Save(); err != nil {
 				return fmt.Errorf("saving store: %w", err)
 			}
@@ -347,4 +348,14 @@ func promptPassword(prompt string) ([]byte, error) {
 	pw, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Fprintln(os.Stderr)
 	return pw, err
+}
+
+func promptValue(prompt string) (string, error) {
+	fmt.Fprint(os.Stderr, prompt)
+	reader := bufio.NewReader(os.Stdin)
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimRight(line, "\r\n"), nil
 }
