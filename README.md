@@ -75,7 +75,6 @@ enveil init
 # Master password: ••••••••
 # Re-enter password: ••••••••
 # Secret store initialised at /home/you/.enveil
-# Next: eval $(enveil agent start)
 ```
 
 ### 2. Start the agent
@@ -91,15 +90,12 @@ eval $(enveil agent start)
 
 ```bash
 enveil secret add stripe key
-# Value for stripe/key: ••••••••••••••••
-
 enveil secret add postgres url
-# Value for postgres/url: ••••••••••••••••
 ```
 
 ### 4. Reference them in your `.env`
 
-```bash
+```
 STRIPE_KEY=enveil://stripe/key
 DATABASE_URL=enveil://postgres/url
 PORT=3000
@@ -108,7 +104,6 @@ PORT=3000
 ### 5. Run your app
 
 ```bash
-enveil run -- printenv DATABASE_URL
 enveil run -- npm run dev
 enveil run --env .env.production -- ./myapp
 ```
@@ -120,92 +115,47 @@ enveil run --env .env.production -- ./myapp
 Add to `~/.zshrc` or `~/.bashrc` so the agent starts automatically and every new terminal window picks it up:
 
 ```bash
-# Source existing agent socket if present
 if [ -f ~/.enveil-agent.env ]; then
   source ~/.enveil-agent.env
 fi
 
-# Start agent if not running, eval exports into current shell
 if ! enveil agent status &>/dev/null; then
   eval $(enveil agent start)
 fi
 ```
 
-**Behaviour by scenario:**
-- **First terminal of the day** — agent not running; prompts for master password once; starts agent; evals socket path into shell
+- **First terminal of the day** — agent not running; prompts once; evals socket path into shell
 - **Every subsequent terminal** — agent already running; sources `~/.enveil-agent.env`; no prompt
-- **After reboot** — stale `~/.enveil-agent.env` exists; `agent status` fails; agent restarts cleanly; prompts once
+- **After reboot** — stale env file exists; `agent status` fails; agent restarts cleanly; prompts once
 
 ---
 
 ## CLI reference
 
 ```
-enveil init                   Initialise a new store (one-time, prompts + confirms password)
+enveil init                                    Initialise a new store (one-time)
 
-enveil agent start            Start the agent (prompts for master password)
-enveil agent stop             Stop the running agent
-enveil agent status           Exit 0 if running, 1 if not
+enveil agent start                             Start the agent (prompts for master password)
+enveil agent stop                              Stop the running agent
+enveil agent status                            Exit 0 if running, 1 if not
 
-enveil run [--env .env] -- <cmd> [args...]
-                              Resolve secrets and exec cmd
+enveil run [--env .env] -- <cmd> [args...]     Resolve secrets and exec cmd
 
-enveil secret add <item> <field>      Prompt for value and add to store
-enveil secret list                    List all item/field keys (never values)
-enveil secret delete <item> <field>   Remove a secret
-enveil secret rotate <item> <field>   Re-prompt and re-encrypt a secret
+enveil secret add <item> <field>               Prompt for value and add to store
+enveil secret list                             List all item/field keys (never values)
+enveil secret delete <item> <field>            Remove a secret
+enveil secret rotate <item> <field>            Re-prompt and re-encrypt a secret
 ```
-
----
-
-## Encrypted store
-
-Secrets are stored in `~/.enveil` — a JSON envelope:
-
-```json
-{
-  "version": 1,
-  "kdf_params": { "memory": 65536, "iterations": 3, "parallelism": 4, "salt": "..." },
-  "nonce": "...",
-  "ciphertext": "..."
-}
-```
-
-- **KDF:** Argon2id — 64 MiB RAM, 3 passes (tuneable)
-- **Encryption:** ChaCha20-Poly1305 — no hardware dependency, constant-time
-
----
-
-## Development
-
-```bash
-# Build (statically linked, no CGO)
-CGO_ENABLED=0 go build -o enveil ./cmd/enveil
-
-# Run all tests
-go test ./...
-
-# Agent protocol tests only
-go test ./internal/agent/...
-
-# CLI integration tests only
-go test ./cmd/enveil/...
-```
-
----
-
-## Dependencies
-
-| Package | Purpose |
-|---|---|
-| `golang.org/x/crypto` | Argon2id, ChaCha20-Poly1305 |
-| `github.com/joho/godotenv` | `.env` file parsing |
-| `github.com/spf13/cobra` | CLI |
-| `golang.org/x/sys` | `prctl` on Linux |
-| `golang.org/x/term` | Masked password prompts |
 
 ---
 
 ## License
 
 MIT
+
+---
+
+## Further reading
+
+- [docs/architecture.md](docs/architecture.md) — encrypted store format and cryptographic details
+- [CONTRIBUTING.md](CONTRIBUTING.md) — development setup and dependencies
